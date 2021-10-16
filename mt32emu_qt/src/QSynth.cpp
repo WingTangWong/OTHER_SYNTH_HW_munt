@@ -986,6 +986,16 @@ bool QSynth::isActive() const {
 	return isOpen() && synth->isActive();
 }
 
+bool QSynth::getDisplayState(char *targetBuffer) const {
+	if (isRealtime()) {
+		// TODO: Implement.
+		memset(targetBuffer, 0, 21);
+		return false;
+	}
+	QMutexLocker synthLocker(synthMutex);
+	return synth->getDisplayState(targetBuffer);
+}
+
 void QSynth::reset() const {
 	if (isRealtime()) {
 		realtimeHelper->resetSynth();

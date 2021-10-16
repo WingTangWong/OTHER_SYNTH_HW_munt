@@ -115,6 +115,7 @@ public:
 
 class Synth {
 friend class DefaultMidiStreamParser;
+friend class Display;
 friend class MemoryRegion;
 friend class Part;
 friend class Partial;
@@ -227,7 +228,9 @@ private:
 
 	void printPartialUsage(Bit32u sampleOffset = 0);
 
-	void newTimbreSet(Bit8u partNum, Bit8u timbreGroup, Bit8u timbreNumber, const char patchName[]);
+	void rhythmNotePlayed() const;
+	void newTimbreSet(Bit8u partNum) const;
+	const char *getSoundGroupName(const Part *part) const;
 	void printDebug(const char *fmt, ...);
 
 	// partNum should be 0..7 for Part 1..8, or 8 for Rhythm
@@ -533,6 +536,13 @@ public:
 
 	// Stores internal state of emulated synth into an array provided (as it would be acquired from hardware).
 	MT32EMU_EXPORT void readMemory(Bit32u addr, Bit32u len, Bit8u *data);
+
+	// Retrieves the current state of the emulated MT-32 display facilities.
+	// Typically, the state is updated during the rendering. However, there might be no need to invoke this method after each call to render(),
+	// e.g. when the render buffer is just a few milliseconds long.
+	// The argument targetBuffer must point to an array of at least 21 characters. The result is a null-terminated string.
+	// Returns whether the MIDI MESSAGE LED is ON and fills the targetBuffer parameter.
+	MT32EMU_EXPORT_V(2.6) bool getDisplayState(char *targetBuffer) const;
 }; // class Synth
 
 } // namespace MT32Emu

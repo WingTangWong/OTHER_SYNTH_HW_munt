@@ -50,34 +50,16 @@ friend class SynthStateMonitor;
 
 public:
 	explicit LCDWidget(const SynthStateMonitor &monitor, QWidget *parent = 0);
-	void reset();
 
 protected:
 	void paintEvent(QPaintEvent *);
 
 private:
-	enum LCDState {
-		DISPLAYING_PART_STATE,
-		DISPLAYING_TIMBRE_NAME,
-		DISPLAYING_MESSAGE
-	};
-
 	const SynthStateMonitor &monitor;
 	const QPixmap lcdOffBackground;
 	const QPixmap lcdOnBackground;
 
-	QByteArray lcdText;
-	LCDState lcdState;
-	MasterClockNanos lcdStateStartNanos;
-	bool maskedChar[20];
-	int masterVolume;
-
-	void setPartStateLCDText();
-	void setProgramChangeLCDText(int partNum, QString bankName, QString timbreName);
-
-private slots:
-	void handleLCDMessageDisplayed(const QString text);
-	void handleMasterVolumeChanged(int volume);
+	char lcdText[21];
 };
 
 class SynthStateMonitor : public QObject {
@@ -105,7 +87,6 @@ private:
 	MT32Emu::Bit8u *keysOfPlayingNotes;
 	MT32Emu::Bit8u *velocitiesOfPlayingNotes;
 
-	MasterClockNanos midiMessageLEDStartNanos;
 	MasterClockNanos previousUpdateNanos;
 	bool enabled;
 	uint partialCount;
@@ -116,7 +97,6 @@ private:
 private slots:
 	void handleUpdate();
 	void handleSynthStateChange(SynthState);
-	void handleMIDIMessagePlayed();
 	void handlePolyStateChanged(int partNum);
 	void handleProgramChanged(int partNum, QString soundGroupName, QString patchName);
 };

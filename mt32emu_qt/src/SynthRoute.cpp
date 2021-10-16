@@ -492,6 +492,10 @@ uint SynthRoute::getPlayingNotes(unsigned int partNumber, MT32Emu::Bit8u *keys, 
 	return qSynth.getPlayingNotes(partNumber, keys, velocities);
 }
 
+bool SynthRoute::getDisplayState(char *targetBuffer) const {
+	return qSynth.getDisplayState(targetBuffer);
+}
+
 void SynthRoute::startRecordingAudio(const QString &fileName) {
 	qSynth.startRecordingAudio(fileName);
 }

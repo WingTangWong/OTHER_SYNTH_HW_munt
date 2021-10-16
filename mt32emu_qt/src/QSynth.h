@@ -179,6 +179,7 @@ public:
 	uint getPartialCount() const;
 	uint getSynthSampleRate() const;
 	bool isActive() const;
+	bool getDisplayState(char *targetBuffer) const;
 
 	void startRecordingAudio(const QString &fileName);
 	void stopRecordingAudio();

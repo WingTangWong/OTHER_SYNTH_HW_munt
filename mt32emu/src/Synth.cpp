@@ -22,6 +22,7 @@
 #include "Synth.h"
 #include "Analog.h"
 #include "BReverbModel.h"
+#include "Display.h"
 #include "File.h"
 #include "MemoryRegion.h"
 #include "MidiEventQueue.h"
@@ -41,7 +42,7 @@ namespace MT32Emu {
 // MIDI interface data transfer rate in samples. Used to simulate the transfer delay.
 static const double MIDI_DATA_TRANSFER_RATE = double(SAMPLE_RATE) / 31250.0 * 8.0;
 
-static const ControlROMFeatureSet OLD_MT32_COMPATIBLE = {
+static const ControlROMFeatureSet OLD_MT32_ELDER = {
 	true,  // quirkBasePitchOverflow
 	true,  // quirkPitchEnvelopeOverflow
 	true,  // quirkRingModulationNoMix
@@ -50,10 +51,26 @@ static const ControlROMFeatureSet OLD_MT32_COMPATIBLE = {
 	true,  // quirkKeyShift
 	true,  // quirkTVFBaseCutoffLimit
 	false, // quirkFastPitchChanges
+	true,  // quirkDisplayCustomMessagePriority
+	true,  // oldMT32DisplayFeatures
 	true,  // defaultReverbMT32Compatible
 	true   // oldMT32AnalogLPF
 };
-static const ControlROMFeatureSet CM32L_COMPATIBLE = {
+static const ControlROMFeatureSet OLD_MT32_LATER = {
+	true,  // quirkBasePitchOverflow
+	true,  // quirkPitchEnvelopeOverflow
+	true,  // quirkRingModulationNoMix
+	true,  // quirkTVAZeroEnvLevels
+	true,  // quirkPanMult
+	true,  // quirkKeyShift
+	true,  // quirkTVFBaseCutoffLimit
+	false, // quirkFastPitchChanges
+	false, // quirkDisplayCustomMessagePriority
+	true,  // oldMT32DisplayFeatures
+	true,  // defaultReverbMT32Compatible
+	true   // oldMT32AnalogLPF
+};
+static const ControlROMFeatureSet NEW_MT32_COMPATIBLE = {
 	false, // quirkBasePitchOverflow
 	false, // quirkPitchEnvelopeOverflow
 	false, // quirkRingModulationNoMix
@@ -62,6 +79,8 @@ static const ControlROMFeatureSet CM32L_COMPATIBLE = {
 	false, // quirkKeyShift
 	false, // quirkTVFBaseCutoffLimit
 	false, // quirkFastPitchChanges
+	false, // quirkDisplayCustomMessagePriority
+	false, // oldMT32DisplayFeatures
 	false, // defaultReverbMT32Compatible
 	false  // oldMT32AnalogLPF
 };
@@ -74,23 +93,25 @@ static const ControlROMFeatureSet CM32LN_COMPATIBLE = {
 	false, // quirkKeyShift
 	false, // quirkTVFBaseCutoffLimit
 	true,  // quirkFastPitchChanges
+	false, // quirkDisplayCustomMessagePriority
+	false, // oldMT32DisplayFeatures
 	false, // defaultReverbMT32Compatible
 	false  // oldMT32AnalogLPF
 };
 
 static const ControlROMMap ControlROMMaps[] = {
-	//     ID                Features        PCMmap  PCMc  tmbrA  tmbrAO, tmbrAC tmbrB   tmbrBO  tmbrBC tmbrR   trC rhythm rhyC  rsrv   panpot   prog   rhyMax  patMax  sysMax  timMax  sndGrp sGC
-	{ "ctrl_mt32_1_04", OLD_MT32_COMPATIBLE, 0x3000, 128, 0x8000, 0x0000, false, 0xC000, 0x4000, false, 0x3200, 30, 0x73A6, 85, 0x57C7, 0x57E2, 0x57D0, 0x5252, 0x525E, 0x526E, 0x520A, 0x7064, 19 },
-	{ "ctrl_mt32_1_05", OLD_MT32_COMPATIBLE, 0x3000, 128, 0x8000, 0x0000, false, 0xC000, 0x4000, false, 0x3200, 30, 0x7414, 85, 0x57C7, 0x57E2, 0x57D0, 0x5252, 0x525E, 0x526E, 0x520A, 0x70CA, 19 },
-	{ "ctrl_mt32_1_06", OLD_MT32_COMPATIBLE, 0x3000, 128, 0x8000, 0x0000, false, 0xC000, 0x4000, false, 0x3200, 30, 0x7414, 85, 0x57D9, 0x57F4, 0x57E2, 0x5264, 0x5270, 0x5280, 0x521C, 0x70CA, 19 },
-	{ "ctrl_mt32_1_07", OLD_MT32_COMPATIBLE, 0x3000, 128, 0x8000, 0x0000, false, 0xC000, 0x4000, false, 0x3200, 30, 0x73fe, 85, 0x57B1, 0x57CC, 0x57BA, 0x523C, 0x5248, 0x5258, 0x51F4, 0x70B0, 19 },
-	{"ctrl_mt32_bluer", OLD_MT32_COMPATIBLE, 0x3000, 128, 0x8000, 0x0000, false, 0xC000, 0x4000, false, 0x3200, 30, 0x741C, 85, 0x57E5, 0x5800, 0x57EE, 0x5270, 0x527C, 0x528C, 0x5228, 0x70CE, 19 },
-	{"ctrl_mt32_2_04",   CM32L_COMPATIBLE,   0x8100, 128, 0x8000, 0x8000, true,  0x8080, 0x8000, true,  0x8500, 64, 0x8580, 85, 0x4F5D, 0x4F78, 0x4F66, 0x4899, 0x489D, 0x48B6, 0x48CD, 0x5A58, 19 },
-	{"ctrl_mt32_2_06",   CM32L_COMPATIBLE,   0x8100, 128, 0x8000, 0x8000, true,  0x8080, 0x8000, true,  0x8500, 64, 0x8580, 85, 0x4F69, 0x4F84, 0x4F72, 0x48A5, 0x48A9, 0x48C2, 0x48D9, 0x5A64, 19 },
-	{"ctrl_mt32_2_07",   CM32L_COMPATIBLE,   0x8100, 128, 0x8000, 0x8000, true,  0x8080, 0x8000, true,  0x8500, 64, 0x8580, 85, 0x4F81, 0x4F9C, 0x4F8A, 0x48B9, 0x48BD, 0x48D6, 0x48ED, 0x5A78, 19 },
-	{"ctrl_cm32l_1_00",  CM32L_COMPATIBLE,   0x8100, 256, 0x8000, 0x8000, true,  0x8080, 0x8000, true,  0x8500, 64, 0x8580, 85, 0x4F65, 0x4F80, 0x4F6E, 0x48A1, 0x48A5, 0x48BE, 0x48D5, 0x5A6C, 19 },
-	{"ctrl_cm32l_1_02",  CM32L_COMPATIBLE,   0x8100, 256, 0x8000, 0x8000, true,  0x8080, 0x8000, true,  0x8500, 64, 0x8580, 85, 0x4F93, 0x4FAE, 0x4F9C, 0x48CB, 0x48CF, 0x48E8, 0x48FF, 0x5A96, 19 },
-	{"ctrl_cm32ln_1_00", CM32LN_COMPATIBLE,  0x8100, 256, 0x8000, 0x8000, true,  0x8080, 0x8000, true,  0x8500, 64, 0x8580, 85, 0x4EC7, 0x4EE2, 0x4ED0, 0x47FF, 0x4803, 0x481C, 0x4833, 0x55A2, 19 }
+	//     ID                Features        PCMmap  PCMc  tmbrA  tmbrAO, tmbrAC tmbrB   tmbrBO  tmbrBC tmbrR   trC rhythm rhyC  rsrv   panpot   prog   rhyMax  patMax  sysMax  timMax  sndGrp sGC  stMsg   sErMsg
+	{"ctrl_mt32_1_04",    OLD_MT32_ELDER,    0x3000, 128, 0x8000, 0x0000, false, 0xC000, 0x4000, false, 0x3200, 30, 0x73A6, 85, 0x57C7, 0x57E2, 0x57D0, 0x5252, 0x525E, 0x526E, 0x520A, 0x7064, 19, 0x217A, 0x4BB6},
+	{"ctrl_mt32_1_05",    OLD_MT32_ELDER,    0x3000, 128, 0x8000, 0x0000, false, 0xC000, 0x4000, false, 0x3200, 30, 0x7414, 85, 0x57C7, 0x57E2, 0x57D0, 0x5252, 0x525E, 0x526E, 0x520A, 0x70CA, 19, 0x217A, 0x4BB6},
+	{"ctrl_mt32_1_06",    OLD_MT32_LATER,    0x3000, 128, 0x8000, 0x0000, false, 0xC000, 0x4000, false, 0x3200, 30, 0x7414, 85, 0x57D9, 0x57F4, 0x57E2, 0x5264, 0x5270, 0x5280, 0x521C, 0x70CA, 19, 0x217A, 0x4BBA},
+	{"ctrl_mt32_1_07",    OLD_MT32_LATER,    0x3000, 128, 0x8000, 0x0000, false, 0xC000, 0x4000, false, 0x3200, 30, 0x73fe, 85, 0x57B1, 0x57CC, 0x57BA, 0x523C, 0x5248, 0x5258, 0x51F4, 0x70B0, 19, 0x217A, 0x4B92},
+	{"ctrl_mt32_bluer",   OLD_MT32_LATER,    0x3000, 128, 0x8000, 0x0000, false, 0xC000, 0x4000, false, 0x3200, 30, 0x741C, 85, 0x57E5, 0x5800, 0x57EE, 0x5270, 0x527C, 0x528C, 0x5228, 0x70CE, 19, 0x217A, 0x4BC6},
+	{"ctrl_mt32_2_04",  NEW_MT32_COMPATIBLE, 0x8100, 128, 0x8000, 0x8000, true,  0x8080, 0x8000, true,  0x8500, 64, 0x8580, 85, 0x4F5D, 0x4F78, 0x4F66, 0x4899, 0x489D, 0x48B6, 0x48CD, 0x5A58, 19, 0x1EF0, 0x406D},
+	{"ctrl_mt32_2_06",  NEW_MT32_COMPATIBLE, 0x8100, 128, 0x8000, 0x8000, true,  0x8080, 0x8000, true,  0x8500, 64, 0x8580, 85, 0x4F69, 0x4F84, 0x4F72, 0x48A5, 0x48A9, 0x48C2, 0x48D9, 0x5A64, 19, 0x1EF0, 0x4021},
+	{"ctrl_mt32_2_07",  NEW_MT32_COMPATIBLE, 0x8100, 128, 0x8000, 0x8000, true,  0x8080, 0x8000, true,  0x8500, 64, 0x8580, 85, 0x4F81, 0x4F9C, 0x4F8A, 0x48B9, 0x48BD, 0x48D6, 0x48ED, 0x5A78, 19, 0x1EE7, 0x4035},
+	{"ctrl_cm32l_1_00", NEW_MT32_COMPATIBLE, 0x8100, 256, 0x8000, 0x8000, true,  0x8080, 0x8000, true,  0x8500, 64, 0x8580, 85, 0x4F65, 0x4F80, 0x4F6E, 0x48A1, 0x48A5, 0x48BE, 0x48D5, 0x5A6C, 19, 0x1EF0, 0x401D},
+	{"ctrl_cm32l_1_02", NEW_MT32_COMPATIBLE, 0x8100, 256, 0x8000, 0x8000, true,  0x8080, 0x8000, true,  0x8500, 64, 0x8580, 85, 0x4F93, 0x4FAE, 0x4F9C, 0x48CB, 0x48CF, 0x48E8, 0x48FF, 0x5A96, 19, 0x1EE7, 0x4047},
+	{"ctrl_cm32ln_1_00", CM32LN_COMPATIBLE,  0x8100, 256, 0x8000, 0x8000, true,  0x8080, 0x8000, true,  0x8500, 64, 0x8580, 85, 0x4EC7, 0x4EE2, 0x4ED0, 0x47FF, 0x4803, 0x481C, 0x4833, 0x55A2, 19, 0x1F59, 0x3F7C}
 	// (Note that old MT-32 ROMs actually have 86 entries for rhythmTemp)
 };
 
@@ -225,6 +246,8 @@ public:
 
 	Bit32u midiEventQueueSize;
 	Bit32u midiEventQueueSysexStorageBufferSize;
+
+	Display *display;
 };
 
 Bit32u Synth::getLibraryVersionInt() {
@@ -305,6 +328,7 @@ Synth::Synth(ReportHandler *useReportHandler) :
 	lastReceivedMIDIEventTimestamp = 0;
 	memset(parts, 0, sizeof(parts));
 	renderedSampleCount = 0;
+	extensions.display = NULL;
 }
 
 Synth::~Synth() {
@@ -326,26 +350,31 @@ void ReportHandler::printDebug(const char *fmt, va_list list) {
 	printf("\n");
 }
 
-void Synth::newTimbreSet(Bit8u partNum, Bit8u timbreGroup, Bit8u timbreNumber, const char patchName[]) {
-	const char *soundGroupName;
-	switch (timbreGroup) {
+void Synth::rhythmNotePlayed() const {
+	extensions.display->rhythmNotePlayed();
+}
+
+void Synth::newTimbreSet(Bit8u partNum) const {
+	const Part *part = getPart(partNum);
+	reportHandler->onProgramChanged(partNum, getSoundGroupName(part), part->getCurrentInstr());
+}
+
+const char *Synth::getSoundGroupName(const Part *part) const {
+	const PatchParam &patch = part->getPatchTemp()->patch;
+	Bit8u timbreNumber = patch.timbreNum;
+	switch (patch.timbreGroup) {
 	case 1:
 		timbreNumber += 64;
 		// Fall-through
 	case 0:
-		soundGroupName = soundGroupNames[soundGroupIx[timbreNumber]];
-		break;
+		return soundGroupNames[soundGroupIx[timbreNumber]];
 	case 2:
-		soundGroupName = soundGroupNames[controlROMMap->soundGroupsCount - 2];
-		break;
+		return soundGroupNames[controlROMMap->soundGroupsCount - 2];
 	case 3:
-		soundGroupName = soundGroupNames[controlROMMap->soundGroupsCount - 1];
-		break;
+		return soundGroupNames[controlROMMap->soundGroupsCount - 1];
 	default:
-		soundGroupName = NULL;
-		break;
+		return NULL;
 	}
-	reportHandler->onProgramChanged(partNum, soundGroupName, patchName);
 }
 
 #define MT32EMU_PRINT_DEBUG \
@@ -864,6 +893,8 @@ bool Synth::open(const ROMImage &controlROMImage, const ROMImage &pcmROMImage, B
 			return false;
 	}
 
+	extensions.display = new Display(*this);
+
 	opened = true;
 	activated = false;
 
@@ -875,6 +906,9 @@ bool Synth::open(const ROMImage &controlROMImage, const ROMImage &pcmROMImage, B
 
 void Synth::dispose() {
 	opened = false;
+
+	delete extensions.display;
+	extensions.display = NULL;
 
 	delete midiQueue;
 	midiQueue = NULL;
@@ -1092,6 +1126,7 @@ void Synth::playMsgOnPart(Bit8u part, Bit8u code, Bit8u note, Bit8u velocity) {
 			parts[part]->noteOff(note);
 		} else {
 			parts[part]->noteOn(note, velocity);
+			extensions.display->midiMessagePlayed();
 		}
 		break;
 	case 0xB: // Control change
@@ -1156,16 +1191,21 @@ void Synth::playMsgOnPart(Bit8u part, Bit8u code, Bit8u note, Bit8u velocity) {
 #endif
 			return;
 		}
-
+		extensions.display->midiMessagePlayed();
 		break;
 	case 0xC: // Program change
 		//printDebug("Program change %01x", note);
 		parts[part]->setProgram(note);
+		if (part < 8) {
+			extensions.display->midiMessagePlayed();
+			extensions.display->programChanged(part);
+		}
 		break;
 	case 0xE: // Pitch bender
 		bend = (velocity << 7) | (note);
 		//printDebug("Pitch bender %02x", bend);
 		parts[part]->setBend(bend);
+		extensions.display->midiMessagePlayed();
 		break;
 	default:
 #if MT32EMU_MONITOR_MIDI > 0
@@ -1223,9 +1263,23 @@ void Synth::playSysexWithoutHeader(Bit8u device, Bit8u command, const Bit8u *sys
 		printDebug("playSysexWithoutHeader: Message is not intended for this device ID (provided: %02x, expected: 0x10 or channel)", int(device));
 		return;
 	}
+
+	// All models process the checksum before anything else and ignore messages lacking the checksum.
+	if (len < 1) {
+		printDebug("playSysexWithoutHeader: Message is too short (%d bytes)!", len);
+		return;
+	}
+	Bit8u checksum = calcSysexChecksum(sysex, len - 1);
+	if (checksum != sysex[len - 1]) {
+		printDebug("playSysexWithoutHeader: Message checksum is incorrect (provided: %02x, expected: %02x)!", sysex[len - 1], checksum);
+		extensions.display->checksumErrorOccurred();
+		return;
+	}
+	len -= 1; // Exclude checksum
+
 	// This is checked early in the real devices (before any sysex length checks or further processing)
 	// FIXME: Response to SYSEX_CMD_DAT reset with partials active (and in general) is untested.
-	if ((command == SYSEX_CMD_DT1 || command == SYSEX_CMD_DAT) && sysex[0] == 0x7F) {
+	if (len > 0 && (command == SYSEX_CMD_DT1 || command == SYSEX_CMD_DAT) && sysex[0] == 0x7F) {
 		reset();
 		return;
 	}
@@ -1236,16 +1290,12 @@ void Synth::playSysexWithoutHeader(Bit8u device, Bit8u command, const Bit8u *sys
 #endif
 		return;
 	}
-	if (len < 4) {
+	if (len < 3) {
+		// FIXME: There are a few edge cases we don't emulate correctly. For example, some messages in the display area
+		// may be composed of just 1 or 2 bytes yet do cause user-visible effects, similarly to the reset area.
 		printDebug("playSysexWithoutHeader: Message is too short (%d bytes)!", len);
 		return;
 	}
-	Bit8u checksum = calcSysexChecksum(sysex, len - 1);
-	if (checksum != sysex[len - 1]) {
-		printDebug("playSysexWithoutHeader: Message checksum is incorrect (provided: %02x, expected: %02x)!", sysex[len - 1], checksum);
-		return;
-	}
-	len -= 1; // Exclude checksum
 	switch (command) {
 	case SYSEX_CMD_WSD:
 #if MT32EMU_MONITOR_SYSEX > 0
@@ -1286,6 +1336,7 @@ void Synth::readSysex(Bit8u /*device*/, const Bit8u * /*sysex*/, Bit32u /*len*/)
 
 void Synth::writeSysex(Bit8u device, const Bit8u *sysex, Bit32u len) {
 	if (!opened) return;
+	extensions.display->midiMessagePlayed();
 	reportHandler->onMIDIMessagePlayed();
 	Bit32u addr = (sysex[0] << 16) | (sysex[1] << 8) | (sysex[2]);
 	addr = MT32EMU_MEMADDR(addr);
@@ -1371,6 +1422,7 @@ void Synth::writeSysexGlobal(Bit32u addr, const Bit8u *sysex, Bit32u len) {
 
 		if (region == NULL) {
 			printDebug("Sysex write to unrecognised address %06x, len %d", MT32EMU_SYSEXMEMADDR(addr), len);
+			// FIXME: Real devices may respond differently to a long SysEx that covers adjacent regions.
 			break;
 		}
 		writeMemoryRegion(region, addr, region->getClampedLen(addr, len), sysex);
@@ -1689,7 +1741,10 @@ void Synth::writeMemoryRegion(const MemoryRegion *region, Bit32u addr, Bit32u le
 		}
 		break;
 	case MR_Display:
-		char buf[SYSEX_BUFFER_SIZE];
+		if (len > Display::LCD_TEXT_SIZE) len = Display::LCD_TEXT_SIZE;
+		if (!extensions.display->customDisplayMessageReceived(data, off, len)) break;
+		// Holds zero-terminated string of the maximum length.
+		char buf[Display::LCD_TEXT_SIZE + 1];
 		memcpy(&buf, &data[0], len);
 		buf[len] = 0;
 #if MT32EMU_MONITOR_SYSEX > 0
@@ -1842,6 +1897,10 @@ void Synth::resetMasterTunePitchDelta() {
 
 Bit32s Synth::getMasterTunePitchDelta() const {
 	return extensions.masterTunePitchDelta;
+}
+
+bool Synth::getDisplayState(char *targetBuffer) const {
+	return extensions.display->updateDisplayState(targetBuffer);
 }
 
 /** Defines an interface of a class that maintains storage of variable-sized data of SysEx messages. */
