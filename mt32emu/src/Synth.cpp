@@ -354,6 +354,10 @@ void Synth::rhythmNotePlayed() const {
 	extensions.display->rhythmNotePlayed();
 }
 
+void Synth::voicePartStateChanged(Bit8u partNum, bool partActivated) const {
+	extensions.display->voicePartStateChanged(partNum, partActivated);
+}
+
 void Synth::newTimbreSet(Bit8u partNum) const {
 	const Part *part = getPart(partNum);
 	reportHandler->onProgramChanged(partNum, getSoundGroupName(part), part->getCurrentInstr());

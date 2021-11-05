@@ -44,6 +44,7 @@ public:
 
 	void midiMessagePlayed();
 	void rhythmNotePlayed();
+	void voicePartStateChanged(Bit8u partIndex, bool activated);
 	void programChanged(Bit8u partIndex);
 	void checksumErrorOccurred();
 	bool customDisplayMessageReceived(const Bit8u *message, Bit32u startIndex, Bit32u length);
@@ -52,6 +53,8 @@ private:
 	typedef Bit8u DisplayBuffer[LCD_TEXT_SIZE];
 
 	Synth &synth;
+
+	bool voicePartStates[8];
 
 	Mode mode;
 	Bit32u displayResetTimestamp;

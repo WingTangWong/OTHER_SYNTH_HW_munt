@@ -144,16 +144,15 @@ Display::Display(Synth &useSynth) :
 	const Bit8u *startupMessage = &synth.controlROMData[synth.controlROMMap->startupMessage];
 	memcpy(displayBuffer, startupMessage, LCD_TEXT_SIZE);
 	memset(customMessageBuffer, ' ', LCD_TEXT_SIZE);
+	memset(voicePartStates, 0, 8);
 }
 
 bool Display::updateDisplayState(char *targetBuffer) {
-	bool partStates[9];
-	synth.getPartStates(partStates);
 	bool ledState = midiMessagePlayedSinceLastReset;
 	maybeResetTimer(midiMessagePlayedSinceLastReset, midiMessageLEDResetTimestamp);
 	// Note, the LED represents activity of the voice parts only.
 	for (Bit32u partIndex = 0; !ledState && partIndex < 8; partIndex++) {
-		ledState = partStates[partIndex];
+		ledState = voicePartStates[partIndex];
 	}
 
 	if (displayResetScheduled && shouldResetTimer(displayResetTimestamp)) {
@@ -164,7 +163,7 @@ bool Display::updateDisplayState(char *targetBuffer) {
 	if (mode == Mode_MAIN) {
 		int position = 0;
 		for (Bit32u partIndex = 0; partIndex < DISPLAYED_VOICE_PARTS_COUNT; partIndex++) {
-			displayBuffer[position++] = partStates[partIndex] ? ACTIVE_PART_INDICATOR : '1' + partIndex;
+			displayBuffer[position++] = voicePartStates[partIndex] ? ACTIVE_PART_INDICATOR : '1' + partIndex;
 			displayBuffer[position++] = ' ';
 		}
 		displayBuffer[position++] = rhythmNotePlayedSinceLastReset ? ACTIVE_PART_INDICATOR : RHYTHM_PART_CODE;
@@ -193,6 +192,12 @@ void Display::midiMessagePlayed() {
 void Display::rhythmNotePlayed() {
 	rhythmNotePlayedSinceLastReset = true;
 	rhythmStateResetTimestamp = synth.renderedSampleCount + BLINK_TIME_FRAMES;
+	if (synth.controlROMFeatures->oldMT32DisplayFeatures && mode == Mode_CUSTOM_MESSAGE) mode = Mode_MAIN;
+}
+
+void Display::voicePartStateChanged(Bit8u partIndex, bool activated) {
+	voicePartStates[partIndex] = activated;
+	if (synth.controlROMFeatures->oldMT32DisplayFeatures && mode == Mode_CUSTOM_MESSAGE) mode = Mode_MAIN;
 }
 
 void Display::programChanged(Bit8u partIndex) {

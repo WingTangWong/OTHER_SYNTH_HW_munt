@@ -63,6 +63,7 @@ Part::Part(Synth *useSynth, unsigned int usePartNum) {
 	expression = 100;
 	pitchBend = 0;
 	activePartialCount = 0;
+	activeNonReleasingPolyCount = 0;
 	memset(patchCache, 0, sizeof(patchCache));
 }
 
@@ -608,6 +609,27 @@ void Part::partialDeactivated(Poly *poly) {
 		synth->partialManager->polyFreed(poly);
 		synth->reportHandler->onPolyStateChanged(Bit8u(partNum));
 	}
+}
+
+void RhythmPart::polyStateChanged(PolyState, PolyState) {}
+
+void Part::polyStateChanged(PolyState oldState, PolyState newState) {
+	switch (newState) {
+	case POLY_Playing:
+		if (activeNonReleasingPolyCount++ == 0) synth->voicePartStateChanged(partNum, true);
+		break;
+	case POLY_Releasing:
+	case POLY_Inactive:
+		if (oldState == POLY_Playing || oldState == POLY_Held) {
+			if (--activeNonReleasingPolyCount == 0) synth->voicePartStateChanged(partNum, false);
+		}
+		break;
+	default:
+		break;
+	}
+#ifdef MT32EMU_TRACE_POLY_STATE_CHANGES
+	synth->printDebug("Part %d: Changed poly state %d->%d, activeNonReleasingPolyCount=%d", partNum, oldState, newState, activeNonReleasingPolyCount);
+#endif
 }
 
 PolyList::PolyList() : firstPoly(NULL), lastPoly(NULL) {}

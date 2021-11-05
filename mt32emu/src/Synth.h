@@ -229,6 +229,7 @@ private:
 	void printPartialUsage(Bit32u sampleOffset = 0);
 
 	void rhythmNotePlayed() const;
+	void voicePartStateChanged(Bit8u partNum, bool activated) const;
 	void newTimbreSet(Bit8u partNum) const;
 	const char *getSoundGroupName(const Part *part) const;
 	void printDebug(const char *fmt, ...);
