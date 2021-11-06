@@ -228,11 +228,18 @@ void Display::checksumErrorOccurred() {
 
 bool Display::customDisplayMessageReceived(const Bit8u *message, Bit32u startIndex, Bit32u length) {
 	if (synth.controlROMFeatures->oldMT32DisplayFeatures) {
-		if (!synth.controlROMFeatures->quirkDisplayCustomMessagePriority && (mode == Mode_PROGRAM_CHANGE || mode == Mode_ERROR_MESSAGE)) return false;
 		for (Bit32u i = 0; i < LCD_TEXT_SIZE; i++) {
 			Bit8u c = i < length ? message[i] : ' ';
 			if (c < 32 || 127 < c) c = ' ';
 			customMessageBuffer[i] = c;
+		}
+		if (!synth.controlROMFeatures->quirkDisplayCustomMessagePriority && (mode == Mode_PROGRAM_CHANGE || mode == Mode_ERROR_MESSAGE)) {
+			if (displayResetScheduled && shouldResetTimer(displayResetTimestamp)) {
+				displayResetScheduled = false;
+				mode = Mode_MAIN;
+			} else {
+				return false;
+			}
 		}
 	} else {
 		if (startIndex > 0x80) return false;
