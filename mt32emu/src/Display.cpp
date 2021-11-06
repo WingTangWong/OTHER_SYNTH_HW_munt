@@ -241,6 +241,7 @@ bool Display::customDisplayMessageReceived(const Bit8u *message, Bit32u startInd
 				return false;
 			}
 		}
+		memcpy(displayBuffer, customMessageBuffer, LCD_TEXT_SIZE);
 	} else {
 		if (startIndex > 0x80) return false;
 		displayResetScheduled = false;
@@ -254,10 +255,29 @@ bool Display::customDisplayMessageReceived(const Bit8u *message, Bit32u startInd
 			if (length > LCD_TEXT_SIZE - startIndex) length = LCD_TEXT_SIZE - startIndex;
 			memcpy(customMessageBuffer + startIndex, message, length);
 		}
+		copyNullTerminatedString(displayBuffer, customMessageBuffer, LCD_TEXT_SIZE);
 	}
 	mode = Mode_CUSTOM_MESSAGE;
-	memcpy(displayBuffer, customMessageBuffer, LCD_TEXT_SIZE);
 	return true;
+}
+
+void Display::displayControlMessageReceived(const Bit8u *messageBytes, Bit32u length) {
+	Bit8u emptyMessage[] = { 0 };
+	if (synth.controlROMFeatures->oldMT32DisplayFeatures) {
+		if (length == 1) {
+			customDisplayMessageReceived(customMessageBuffer, 0, LCD_TEXT_SIZE);
+		} else {
+			customDisplayMessageReceived(emptyMessage, 0, 0);
+		}
+	} else {
+		// Always assume the third byte to be zero for simplicity.
+		if (length == 2) {
+			customDisplayMessageReceived(emptyMessage, messageBytes[1] << 7, 0);
+		} else if (length == 1) {
+			customMessageBuffer[0] = 0;
+			customDisplayMessageReceived(emptyMessage, 0x80, 0);
+		}
+	}
 }
 
 void Display::scheduleDisplayReset() {

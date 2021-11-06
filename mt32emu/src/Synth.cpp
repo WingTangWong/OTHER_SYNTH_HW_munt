@@ -1268,8 +1268,8 @@ void Synth::playSysexWithoutHeader(Bit8u device, Bit8u command, const Bit8u *sys
 		return;
 	}
 
-	// All models process the checksum before anything else and ignore messages lacking the checksum.
-	if (len < 1) {
+	// All models process the checksum before anything else and ignore messages lacking the checksum, or containing the checksum only.
+	if (len < 2) {
 		printDebug("playSysexWithoutHeader: Message is too short (%d bytes)!", len);
 		return;
 	}
@@ -1281,23 +1281,10 @@ void Synth::playSysexWithoutHeader(Bit8u device, Bit8u command, const Bit8u *sys
 	}
 	len -= 1; // Exclude checksum
 
-	// This is checked early in the real devices (before any sysex length checks or further processing)
-	// FIXME: Response to SYSEX_CMD_DAT reset with partials active (and in general) is untested.
-	if (len > 0 && (command == SYSEX_CMD_DT1 || command == SYSEX_CMD_DAT) && sysex[0] == 0x7F) {
-		reset();
-		return;
-	}
-
 	if (command == SYSEX_CMD_EOD) {
 #if MT32EMU_MONITOR_SYSEX > 0
 		printDebug("playSysexWithoutHeader: Ignored unsupported command %02x", command);
 #endif
-		return;
-	}
-	if (len < 3) {
-		// FIXME: There are a few edge cases we don't emulate correctly. For example, some messages in the display area
-		// may be composed of just 1 or 2 bytes yet do cause user-visible effects, similarly to the reset area.
-		printDebug("playSysexWithoutHeader: Message is too short (%d bytes)!", len);
 		return;
 	}
 	switch (command) {
@@ -1340,12 +1327,33 @@ void Synth::readSysex(Bit8u /*device*/, const Bit8u * /*sysex*/, Bit32u /*len*/)
 
 void Synth::writeSysex(Bit8u device, const Bit8u *sysex, Bit32u len) {
 	if (!opened) return;
+
+	// This is checked early in the real devices (before any sysex length checks or further processing)
+	if (sysex[0] == 0x7F) {
+		if (!controlROMFeatures->oldMT32DisplayFeatures) extensions.display->midiMessagePlayed();
+		reset();
+		return;
+	}
+
 	extensions.display->midiMessagePlayed();
 	reportHandler->onMIDIMessagePlayed();
+
+	if (len < 3) {
+		// A short message of just 1 or 2 bytes may be written to the display area yet it may cause a user-visible effect,
+		// similarly to the reset area.
+		if (sysex[0] == 0x20) {
+			extensions.display->displayControlMessageReceived(sysex, len);
+			return;
+		}
+		printDebug("playSysexWithoutHeader: Message is too short (%d bytes)!", len);
+		return;
+	}
+
 	Bit32u addr = (sysex[0] << 16) | (sysex[1] << 8) | (sysex[2]);
 	addr = MT32EMU_MEMADDR(addr);
 	sysex += 3;
 	len -= 3;
+
 	//printDebug("Sysex addr: 0x%06x", MT32EMU_SYSEXMEMADDR(addr));
 	// NOTE: Please keep both lower and upper bounds in each check, for ease of reading
 
