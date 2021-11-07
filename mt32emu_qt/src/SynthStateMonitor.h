@@ -52,6 +52,7 @@ public:
 	explicit LCDWidget(const SynthStateMonitor &monitor, QWidget *parent = 0);
 
 protected:
+	int heightForWidth (int) const;
 	void paintEvent(QPaintEvent *);
 
 private:

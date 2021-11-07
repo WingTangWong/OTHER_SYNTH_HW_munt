@@ -31,10 +31,12 @@ static const QColor partialStateColor[] = {COLOR_GRAY, Qt::red, Qt::yellow, Qt::
 static const uint LCD_BOTTOM_ROW_INDEX = 6;
 static const uint LCD_ROW_COUNT = 8;
 
+static const qreal LCD_SCALE_FACTOR = 1.0 / 4.0;
 static const uint LCD_PIXEL_SIZE = 7;
 static const uint LCD_PIXEL_SIZE_WITH_SPACING = 8;
 static const uint LCD_UNDERLINE_GAP = LCD_PIXEL_SIZE_WITH_SPACING;
 static const uint LCD_COLUMN_SIZE_WITH_SPACING = 6 * LCD_PIXEL_SIZE_WITH_SPACING;
+static const QPoint LCD_CONTENT_INSETS = QPoint(8, 10);
 
 using namespace MT32Emu;
 
@@ -47,7 +49,9 @@ SynthStateMonitor::SynthStateMonitor(Ui::SynthWidget *ui, SynthRoute *useSynthRo
 	partialCount = useSynthRoute->getPartialCount();
 	allocatePartialsData();
 
-	lcdWidget.setMinimumSize(254, 40);
+	QSizePolicy lcdWidgetPolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+	lcdWidgetPolicy.setHeightForWidth(true);
+	lcdWidget.setSizePolicy(lcdWidgetPolicy);
 	ui->synthFrameLayout->insertWidget(1, &lcdWidget);
 	midiMessageLED.setMinimumSize(10, 2);
 	ui->midiMessageLayout->addWidget(&midiMessageLED, 0, Qt::AlignHCenter);
@@ -204,16 +208,20 @@ LCDWidget::LCDWidget(const SynthStateMonitor &monitor, QWidget *parent) :
 	lcdOnBackground(":/images/LCDOn.gif")
 {}
 
+int LCDWidget::heightForWidth (int useWidth) const {
+	return useWidth * lcdOnBackground.height() / lcdOnBackground.width();
+}
+
 void LCDWidget::paintEvent(QPaintEvent *) {
 	QPainter lcdPainter(this);
 	lcdPainter.setRenderHint(QPainter::Antialiasing, true);
-	if (monitor.synthRoute->getState() != SynthRouteState_OPEN) {
-		lcdPainter.drawPixmap(0, 0, lcdOffBackground);
-		return;
-	}
-	lcdPainter.drawPixmap(0, 0, lcdOnBackground);
-	lcdPainter.translate(8, 10);
-	lcdPainter.scale(0.25, 0.25);
+	qreal scaleFactor = qreal(width()) / lcdOnBackground.width();
+	lcdPainter.scale(scaleFactor, scaleFactor);
+	bool open = monitor.synthRoute->getState() == SynthRouteState_OPEN;
+	lcdPainter.drawPixmap(0, 0, open ? lcdOnBackground : lcdOffBackground);
+	if (!open) return;
+	lcdPainter.translate(LCD_CONTENT_INSETS);
+	lcdPainter.scale(LCD_SCALE_FACTOR, LCD_SCALE_FACTOR);
 
 	QRect rect(0, 0, LCD_PIXEL_SIZE, LCD_PIXEL_SIZE);
 	for (int position = 0; position < 20; position++) {
