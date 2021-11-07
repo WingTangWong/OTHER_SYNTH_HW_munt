@@ -155,10 +155,7 @@ bool Display::updateDisplayState(char *targetBuffer) {
 		ledState = voicePartStates[partIndex];
 	}
 
-	if (displayResetScheduled && shouldResetTimer(displayResetTimestamp)) {
-		displayResetScheduled = false;
-		mode = Mode_MAIN;
-	}
+	if (displayResetScheduled && shouldResetTimer(displayResetTimestamp)) setMainDisplayMode();
 
 	if (mode == Mode_MAIN) {
 		int position = 0;
@@ -184,6 +181,11 @@ bool Display::updateDisplayState(char *targetBuffer) {
 	return ledState;
 }
 
+void Display::setMainDisplayMode() {
+	displayResetScheduled = false;
+	mode = Mode_MAIN;
+}
+
 void Display::midiMessagePlayed() {
 	midiMessagePlayedSinceLastReset = true;
 	midiMessageLEDResetTimestamp = synth.renderedSampleCount + BLINK_TIME_FRAMES;
@@ -192,12 +194,12 @@ void Display::midiMessagePlayed() {
 void Display::rhythmNotePlayed() {
 	rhythmNotePlayedSinceLastReset = true;
 	rhythmStateResetTimestamp = synth.renderedSampleCount + BLINK_TIME_FRAMES;
-	if (synth.controlROMFeatures->oldMT32DisplayFeatures && mode == Mode_CUSTOM_MESSAGE) mode = Mode_MAIN;
+	if (synth.controlROMFeatures->oldMT32DisplayFeatures && mode == Mode_CUSTOM_MESSAGE) setMainDisplayMode();
 }
 
 void Display::voicePartStateChanged(Bit8u partIndex, bool activated) {
 	voicePartStates[partIndex] = activated;
-	if (synth.controlROMFeatures->oldMT32DisplayFeatures && mode == Mode_CUSTOM_MESSAGE) mode = Mode_MAIN;
+	if (synth.controlROMFeatures->oldMT32DisplayFeatures && mode == Mode_CUSTOM_MESSAGE) setMainDisplayMode();
 }
 
 void Display::programChanged(Bit8u partIndex) {
@@ -235,8 +237,7 @@ bool Display::customDisplayMessageReceived(const Bit8u *message, Bit32u startInd
 		}
 		if (!synth.controlROMFeatures->quirkDisplayCustomMessagePriority && (mode == Mode_PROGRAM_CHANGE || mode == Mode_ERROR_MESSAGE)) {
 			if (displayResetScheduled && shouldResetTimer(displayResetTimestamp)) {
-				displayResetScheduled = false;
-				mode = Mode_MAIN;
+				setMainDisplayMode();
 			} else {
 				return false;
 			}
@@ -246,9 +247,7 @@ bool Display::customDisplayMessageReceived(const Bit8u *message, Bit32u startInd
 		if (startIndex > 0x80) return false;
 		displayResetScheduled = false;
 		if (startIndex == 0x80) {
-			if (mode == Mode_CUSTOM_MESSAGE || mode == Mode_ERROR_MESSAGE)  {
-				mode = Mode_MAIN;
-			}
+			if (mode == Mode_CUSTOM_MESSAGE || mode == Mode_ERROR_MESSAGE) mode = Mode_MAIN;
 			return false;
 		}
 		if (startIndex < LCD_TEXT_SIZE) {

@@ -506,8 +506,8 @@ public:
 		tempState.midiMessagePlayed = true;
 	}
 
-	void onMasterVolumeChanged(Bit8u masterVolume) {
-		tempState.masterVolumeUpdate = masterVolume;
+	void onMasterVolumeChanged(Bit8u useMasterVolume) {
+		tempState.masterVolumeUpdate = useMasterVolume;
 	}
 
 	void onReverbModeUpdated(Bit8u mode) {
@@ -994,6 +994,15 @@ bool QSynth::getDisplayState(char *targetBuffer) const {
 	}
 	QMutexLocker synthLocker(synthMutex);
 	return synth->getDisplayState(targetBuffer);
+}
+
+void QSynth::setMainDisplayMode() {
+	if (isRealtime()) {
+		// TODO: Implement.
+	} else {
+		QMutexLocker synthLocker(synthMutex);
+		synth->setMainDisplayMode();
+	}
 }
 
 void QSynth::reset() const {

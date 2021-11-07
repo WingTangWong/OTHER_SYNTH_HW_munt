@@ -544,6 +544,11 @@ public:
 	// The argument targetBuffer must point to an array of at least 21 characters. The result is a null-terminated string.
 	// Returns whether the MIDI MESSAGE LED is ON and fills the targetBuffer parameter.
 	MT32EMU_EXPORT_V(2.6) bool getDisplayState(char *targetBuffer) const;
+
+	// Resets the emulated LCD to the main mode (Master Volume). This has the same effect as pressing the Master Volume button
+	// while the display shows some other message. Useful for the new-gen devices as those require a special Display Reset SysEx
+	// to return to the main mode e.g. from showing a custom display message or a checksum error.
+	MT32EMU_EXPORT_V(2.6) void setMainDisplayMode();
 }; // class Synth
 
 } // namespace MT32Emu

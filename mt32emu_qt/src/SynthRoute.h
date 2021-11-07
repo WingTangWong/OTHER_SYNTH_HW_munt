@@ -62,6 +62,7 @@ public:
 	uint getPlayingNotes(unsigned int partNumber, MT32Emu::Bit8u *keys, MT32Emu::Bit8u *velocities) const;
 	uint getPartialCount() const;
 	bool getDisplayState(char *targetBuffer) const;
+	void setMainDisplayMode();
 
 	void flushMIDIQueue();
 	void playMIDIShortMessageNow(MT32Emu::Bit32u msg);

@@ -496,6 +496,10 @@ bool SynthRoute::getDisplayState(char *targetBuffer) const {
 	return qSynth.getDisplayState(targetBuffer);
 }
 
+void SynthRoute::setMainDisplayMode() {
+	qSynth.setMainDisplayMode();
+}
+
 void SynthRoute::startRecordingAudio(const QString &fileName) {
 	qSynth.startRecordingAudio(fileName);
 }

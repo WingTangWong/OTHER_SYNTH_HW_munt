@@ -41,6 +41,7 @@ public:
 	Display(Synth &synth);
 	/** Returns whether the MIDI MESSAGE LED is ON and fills the targetBuffer parameter. */
 	bool updateDisplayState(char *targetBuffer);
+	void setMainDisplayMode();
 
 	void midiMessagePlayed();
 	void rhythmNotePlayed();

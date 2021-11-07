@@ -1920,6 +1920,10 @@ bool Synth::getDisplayState(char *targetBuffer) const {
 	return extensions.display->updateDisplayState(targetBuffer);
 }
 
+void Synth::setMainDisplayMode() {
+	if (opened) extensions.display->setMainDisplayMode();
+}
+
 /** Defines an interface of a class that maintains storage of variable-sized data of SysEx messages. */
 class MidiEventQueue::SysexDataStorage {
 public:

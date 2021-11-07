@@ -54,6 +54,7 @@ public:
 protected:
 	int heightForWidth (int) const;
 	void paintEvent(QPaintEvent *);
+	void mousePressEvent(QMouseEvent *);
 
 private:
 	const SynthStateMonitor &monitor;
@@ -75,7 +76,7 @@ public:
 	void enableMonitor(bool enable);
 
 private:
-	const SynthRoute * const synthRoute;
+	SynthRoute * const synthRoute;
 
 	const Ui::SynthWidget * const ui;
 	LCDWidget lcdWidget;

@@ -257,3 +257,7 @@ void LCDWidget::paintEvent(QPaintEvent *) {
 		lcdPainter.translate(LCD_COLUMN_SIZE_WITH_SPACING, 0);
 	}
 }
+
+void LCDWidget::mousePressEvent(QMouseEvent *) {
+	monitor.synthRoute->setMainDisplayMode();
+}
