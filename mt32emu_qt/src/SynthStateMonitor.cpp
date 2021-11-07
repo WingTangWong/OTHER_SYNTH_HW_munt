@@ -92,11 +92,7 @@ void SynthStateMonitor::enableMonitor(bool enable) {
 
 void SynthStateMonitor::handleSynthStateChange(SynthState state) {
 	enableMonitor(state == SynthState_OPEN);
-	if (enabled) {
-		handleUpdate();
-	} else {
-		midiMessageLED.setColor(&COLOR_GRAY);
-	}
+	midiMessageLED.setColor(&COLOR_GRAY);
 
 	uint newPartialCount = synthRoute->getPartialCount();
 	if (partialCount == newPartialCount || state != SynthState_OPEN) {
@@ -113,6 +109,8 @@ void SynthStateMonitor::handleSynthStateChange(SynthState state) {
 		patchNameLabel[i]->setText((i < 8) ? synthRoute->getPatchName(i) : "Rhythm Channel");
 		partStateWidget[i]->update();
 	}
+
+	handleUpdate();
 }
 
 void SynthStateMonitor::handlePolyStateChanged(int partNum) {
@@ -131,6 +129,11 @@ void SynthStateMonitor::handleUpdate() {
 	bool midiMessageOn = synthRoute->getDisplayState(lcdWidget.lcdText);
 	lcdWidget.update();
 	midiMessageLED.setColor(midiMessageOn ? &COLOR_GREEN : &COLOR_GRAY);
+
+	synthRoute->getPartialStates(partialStates);
+	for (unsigned int partialNum = 0; partialNum < partialCount; partialNum++) {
+		partialStateLED[partialNum]->setColor(&partialStateColor[partialStates[partialNum]]);
+	}
 }
 
 void SynthStateMonitor::allocatePartialsData() {
