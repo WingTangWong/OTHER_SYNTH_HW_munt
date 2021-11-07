@@ -1912,6 +1912,11 @@ Bit32s Synth::getMasterTunePitchDelta() const {
 }
 
 bool Synth::getDisplayState(char *targetBuffer) const {
+	if (!opened) {
+		memset(targetBuffer, ' ', Display::LCD_TEXT_SIZE);
+		targetBuffer[Display::LCD_TEXT_SIZE] = 0;
+		return false;
+	}
 	return extensions.display->updateDisplayState(targetBuffer);
 }
 
