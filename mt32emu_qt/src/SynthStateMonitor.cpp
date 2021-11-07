@@ -92,7 +92,11 @@ void SynthStateMonitor::enableMonitor(bool enable) {
 
 void SynthStateMonitor::handleSynthStateChange(SynthState state) {
 	enableMonitor(state == SynthState_OPEN);
-	midiMessageLED.setColor(&COLOR_GRAY);
+	if (enabled) {
+		handleUpdate();
+	} else {
+		midiMessageLED.setColor(&COLOR_GRAY);
+	}
 
 	uint newPartialCount = synthRoute->getPartialCount();
 	if (partialCount == newPartialCount || state != SynthState_OPEN) {
