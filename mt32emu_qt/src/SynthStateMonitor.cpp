@@ -24,9 +24,17 @@ static const MasterClockNanos MINIMUM_UPDATE_INTERVAL_NANOS = 30 * MasterClock::
 
 static const QColor COLOR_GRAY = QColor(100, 100, 100);
 static const QColor COLOR_GREEN = Qt::green;
-static const QColor lcdBgColor(98, 127, 0);
-static const QColor lcdFgColor(232, 254, 0);
+static const QColor lcdUnlitColor = QColor::fromRgba(0x32F2FEEDU);
+static const QColor lcdLitColor = QColor::fromRgb(0xCAFB10U);
 static const QColor partialStateColor[] = {COLOR_GRAY, Qt::red, Qt::yellow, Qt::green};
+
+static const uint LCD_BOTTOM_ROW_INDEX = 6;
+static const uint LCD_ROW_COUNT = 8;
+
+static const uint LCD_PIXEL_SIZE = 7;
+static const uint LCD_PIXEL_SIZE_WITH_SPACING = 8;
+static const uint LCD_UNDERLINE_GAP = LCD_PIXEL_SIZE_WITH_SPACING;
+static const uint LCD_COLUMN_SIZE_WITH_SPACING = 6 * LCD_PIXEL_SIZE_WITH_SPACING;
 
 using namespace MT32Emu;
 
@@ -198,43 +206,39 @@ LCDWidget::LCDWidget(const SynthStateMonitor &monitor, QWidget *parent) :
 
 void LCDWidget::paintEvent(QPaintEvent *) {
 	QPainter lcdPainter(this);
+	lcdPainter.setRenderHint(QPainter::Antialiasing, true);
 	if (monitor.synthRoute->getState() != SynthRouteState_OPEN) {
 		lcdPainter.drawPixmap(0, 0, lcdOffBackground);
 		return;
 	}
 	lcdPainter.drawPixmap(0, 0, lcdOnBackground);
-	lcdPainter.translate(7, 9);
+	lcdPainter.translate(8, 10);
+	lcdPainter.scale(0.25, 0.25);
 
-	int xat, xstart, yat;
-	xstart = 0;
-	yat = 0;
-
-	for (int i = 0; i < 20; i++) {
-		uchar c = lcdText[i];
+	QRect rect(0, 0, LCD_PIXEL_SIZE, LCD_PIXEL_SIZE);
+	for (int position = 0; position < 20; position++) {
+		uchar charCode = lcdText[position];
 
 		// Map special characters to what we have defined in the font.
-		if (c > 0x7f) c = 0x20;
-		else if (c == 0x01) c = 0x80;
-		else if (c == 0x02) c = 0x7c;
-		else if (c < 0x20) c = 0x20;
+		if (charCode > 0x7f) charCode = 0x20;
+		else if (charCode == 0x01) charCode = 0x80;
+		else if (charCode == 0x02) charCode = 0x7C;
+		else if (charCode < 0x20) charCode = 0x20;
 
-		c -= 0x20;
+		charCode -= 0x20;
 
-		yat = 1;
-		for (int t = 0; t < 8; t++) {
-			xat = xstart;
-			unsigned char fval = Font_6x8[c][t];
-			for (int m = 4; m >= 0; --m) {
-				if ((fval >> m) & 1) {
-					lcdPainter.fillRect(xat, yat, 2, 2, lcdFgColor);
-				} else {
-					lcdPainter.fillRect(xat, yat, 2, 2, lcdBgColor);
-				}
-				xat += 2;
+		for (uint rowIndex = 0; rowIndex < LCD_ROW_COUNT; rowIndex++) {
+			uchar row = Font_6x8[charCode][rowIndex];
+			for (uint mask = 0x10; mask > 0; mask >>= 1) {
+				const QColor &color = (row & mask) ? lcdLitColor : lcdUnlitColor;
+				lcdPainter.fillRect(rect, color);
+				rect.moveLeft(rect.x() + LCD_PIXEL_SIZE_WITH_SPACING);
 			}
-			yat += 2;
-			if (t == 6) yat += 2;
+			rect.moveLeft(0);
+			rect.moveTop(rect.y() + LCD_PIXEL_SIZE_WITH_SPACING);
+			if (rowIndex == LCD_BOTTOM_ROW_INDEX) rect.moveTop(rect.y() + LCD_UNDERLINE_GAP);
 		}
-		xstart += 12;
+		rect.moveTop(0);
+		lcdPainter.translate(LCD_COLUMN_SIZE_WITH_SPACING, 0);
 	}
 }
