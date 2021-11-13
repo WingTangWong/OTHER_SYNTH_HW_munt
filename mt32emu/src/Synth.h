@@ -113,6 +113,17 @@ public:
 	virtual void onProgramChanged(Bit8u /* partNum */, const char * /* soundGroupName */, const char * /* patchName */) {}
 };
 
+// Extends ReportHandler, so that the client may supply callbacks for reporting signals about updated display state.
+class MT32EMU_EXPORT_V(2.6) ReportHandler2 : public ReportHandler {
+public:
+	virtual ~ReportHandler2() {}
+
+	// Invoked when the emulated LCD changes state. Use method Synth::getDisplayState to retrieve the actual data.
+	virtual void lcdStateUpdated() {}
+	// Invoked when the emulated MIDI message LED changes state. The state parameter represents whether the MIDI MESSAGE LED is ON.
+	virtual void midiMessageLEDStateUpdated(bool /* ledState */) {}
+};
+
 class Synth {
 friend class DefaultMidiStreamParser;
 friend class Display;
@@ -178,7 +189,7 @@ private:
 	bool opened;
 	bool activated;
 
-	bool isDefaultReportHandler;
+	bool isDefaultReportHandler; // No longer used, retained for binary compatibility only.
 	ReportHandler *reportHandler;
 
 	PartialManager *partialManager;
@@ -293,6 +304,10 @@ public:
 	// Optionally sets callbacks for reporting various errors, information and debug messages
 	MT32EMU_EXPORT explicit Synth(ReportHandler *useReportHandler = NULL);
 	MT32EMU_EXPORT ~Synth();
+
+	// Sets an implementation of ReportHandler2 interface for reporting various errors, information and debug messages.
+	// If the argument is NULL, the default implementation is installed as a fallback.
+	MT32EMU_EXPORT_V(2.6) void setReportHandler2(ReportHandler2 *reportHandler2);
 
 	// Used to initialise the MT-32. Must be called before any other function.
 	// Returns true if initialization was successful, otherwise returns false.

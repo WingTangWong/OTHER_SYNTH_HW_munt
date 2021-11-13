@@ -39,8 +39,9 @@ public:
 	};
 
 	Display(Synth &synth);
+	void checkDisplayStateUpdated(bool &midiMessageLEDState, bool &midiMessageLEDUpdated, bool &lcdUpdated);
 	/** Returns whether the MIDI MESSAGE LED is ON and fills the targetBuffer parameter. */
-	bool updateDisplayState(char *targetBuffer);
+	bool getDisplayState(char *targetBuffer);
 	void setMainDisplayMode();
 
 	void midiMessagePlayed();
@@ -54,9 +55,19 @@ public:
 private:
 	typedef Bit8u DisplayBuffer[LCD_TEXT_SIZE];
 
+	static const unsigned int TIMBRE_NAME_SIZE = 10;
+
 	Synth &synth;
 
+	bool lastLEDState;
+	bool lcdDirty;
+	bool lcdUpdateSignalled;
+	bool lastRhythmPartState;
 	bool voicePartStates[8];
+
+	Bit8u lastProgramChangePartIndex;
+	const char *lastProgramChangeSoundGroupName;
+	Bit8u lastProgramChangeTimbreName[TIMBRE_NAME_SIZE];
 
 	Mode mode;
 	Bit32u displayResetTimestamp;

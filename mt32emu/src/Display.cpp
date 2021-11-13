@@ -105,13 +105,14 @@ namespace MT32Emu {
  *   message is received on that part (sometimes even when that actually produces no sound).
  */
 
-static const char MASTER_VOLUME[] = "|vol:  0";
+static const char MASTER_VOLUME_WITH_DELIMITER[] = "|vol:  0";
 static const Bit8u RHYTHM_PART_CODE = 'R';
 static const Bit8u FIELD_DELIMITER = '|';
 static const Bit8u ACTIVE_PART_INDICATOR = 1;
 
 static const Bit32u DISPLAYED_VOICE_PARTS_COUNT = 5;
 static const Bit32u SOUND_GROUP_NAME_WITH_DELIMITER_SIZE = 8;
+static const Bit32u MASTER_VOLUME_WITH_DELIMITER_SIZE = sizeof(MASTER_VOLUME_WITH_DELIMITER) - 1;
 
 // This is the period to show those short blinks of MIDI MESSAGE LED and the rhythm part state.
 // Two related countdowns are initialised to 8 and touched each 10 milliseconds by the software timer 0 interrupt handler.
@@ -137,9 +138,14 @@ static void copyNullTerminatedString(Bit8u *destination, const Bit8u *source, Bi
 
 Display::Display(Synth &useSynth) :
 	synth(useSynth),
+	lastLEDState(),
+	lcdDirty(),
+	lcdUpdateSignalled(),
+	lastRhythmPartState(),
 	mode(Mode_STARTUP_MESSAGE),
 	midiMessagePlayedSinceLastReset(),
-	rhythmNotePlayedSinceLastReset() {
+	rhythmNotePlayedSinceLastReset()
+{
 	scheduleDisplayReset();
 	const Bit8u *startupMessage = &synth.controlROMData[synth.controlROMMap->startupMessage];
 	memcpy(displayBuffer, startupMessage, LCD_TEXT_SIZE);
@@ -147,43 +153,85 @@ Display::Display(Synth &useSynth) :
 	memset(voicePartStates, 0, 8);
 }
 
-bool Display::updateDisplayState(char *targetBuffer) {
-	bool ledState = midiMessagePlayedSinceLastReset;
+void Display::checkDisplayStateUpdated(bool &midiMessageLEDState, bool &midiMessageLEDUpdated, bool &lcdUpdated) {
+	midiMessageLEDState = midiMessagePlayedSinceLastReset;
 	maybeResetTimer(midiMessagePlayedSinceLastReset, midiMessageLEDResetTimestamp);
 	// Note, the LED represents activity of the voice parts only.
-	for (Bit32u partIndex = 0; !ledState && partIndex < 8; partIndex++) {
-		ledState = voicePartStates[partIndex];
+	for (Bit32u partIndex = 0; !midiMessageLEDState && partIndex < 8; partIndex++) {
+		midiMessageLEDState = voicePartStates[partIndex];
 	}
+	midiMessageLEDUpdated = lastLEDState != midiMessageLEDState;
+	lastLEDState = midiMessageLEDState;
 
 	if (displayResetScheduled && shouldResetTimer(displayResetTimestamp)) setMainDisplayMode();
 
-	if (mode == Mode_MAIN) {
-		int position = 0;
-		for (Bit32u partIndex = 0; partIndex < DISPLAYED_VOICE_PARTS_COUNT; partIndex++) {
-			displayBuffer[position++] = voicePartStates[partIndex] ? ACTIVE_PART_INDICATOR : '1' + partIndex;
-			displayBuffer[position++] = ' ';
+	if (lastRhythmPartState != rhythmNotePlayedSinceLastReset && mode == Mode_MAIN) lcdDirty = true;
+	lastRhythmPartState = rhythmNotePlayedSinceLastReset;
+	maybeResetTimer(rhythmNotePlayedSinceLastReset, rhythmStateResetTimestamp);
+
+	lcdUpdated = lcdDirty && !lcdUpdateSignalled;
+	if (lcdUpdated) lcdUpdateSignalled = true;
+}
+
+bool Display::getDisplayState(char *targetBuffer) {
+	if (lcdUpdateSignalled) {
+		lcdDirty = false;
+		lcdUpdateSignalled = false;
+
+		switch (mode) {
+		case Mode_CUSTOM_MESSAGE:
+			if (synth.controlROMFeatures->oldMT32DisplayFeatures) {
+				memcpy(displayBuffer, customMessageBuffer, LCD_TEXT_SIZE);
+			} else {
+				copyNullTerminatedString(displayBuffer, customMessageBuffer, LCD_TEXT_SIZE);
+			}
+			break;
+		case Mode_ERROR_MESSAGE: {
+			const Bit8u *sysexErrorMessage = &synth.controlROMData[synth.controlROMMap->sysexErrorMessage];
+			memcpy(displayBuffer, sysexErrorMessage, LCD_TEXT_SIZE);
+			break;
 		}
-		displayBuffer[position++] = rhythmNotePlayedSinceLastReset ? ACTIVE_PART_INDICATOR : RHYTHM_PART_CODE;
-		displayBuffer[position++] = ' ';
-		memcpy(&displayBuffer[position], MASTER_VOLUME, 8);
-		position += 8;
-		Bit32u masterVol = synth.mt32ram.system.masterVol;
-		while (masterVol > 0) {
-			std::div_t result = std::div(masterVol, 10);
-			displayBuffer[--position] = '0' + result.rem;
-			masterVol = result.quot;
+		case Mode_PROGRAM_CHANGE: {
+			Bit8u *writePosition = displayBuffer;
+			*writePosition++ = '1' + lastProgramChangePartIndex;
+			*writePosition++ = FIELD_DELIMITER;
+			memcpy(writePosition, lastProgramChangeSoundGroupName, SOUND_GROUP_NAME_WITH_DELIMITER_SIZE);
+			writePosition += SOUND_GROUP_NAME_WITH_DELIMITER_SIZE;
+			copyNullTerminatedString(writePosition, lastProgramChangeTimbreName, TIMBRE_NAME_SIZE);
+			break;
+		}
+		case Mode_MAIN: {
+			Bit8u *writePosition = displayBuffer;
+			for (Bit32u partIndex = 0; partIndex < DISPLAYED_VOICE_PARTS_COUNT; partIndex++) {
+				*writePosition++ = voicePartStates[partIndex] ? ACTIVE_PART_INDICATOR : '1' + partIndex;
+				*writePosition++ = ' ';
+			}
+			*writePosition++ = lastRhythmPartState ? ACTIVE_PART_INDICATOR : RHYTHM_PART_CODE;
+			*writePosition++ = ' ';
+			memcpy(writePosition, MASTER_VOLUME_WITH_DELIMITER, MASTER_VOLUME_WITH_DELIMITER_SIZE);
+			writePosition += MASTER_VOLUME_WITH_DELIMITER_SIZE;
+			Bit32u masterVol = synth.mt32ram.system.masterVol;
+			while (masterVol > 0) {
+				std::div_t result = std::div(masterVol, 10);
+				*--writePosition = '0' + result.rem;
+				masterVol = result.quot;
+			}
+			break;
+		}
+		default:
+			break;
 		}
 	}
-	maybeResetTimer(rhythmNotePlayedSinceLastReset, rhythmStateResetTimestamp);
 
 	memcpy(targetBuffer, displayBuffer, LCD_TEXT_SIZE);
 	targetBuffer[LCD_TEXT_SIZE] = 0;
-	return ledState;
+	return lastLEDState;
 }
 
 void Display::setMainDisplayMode() {
 	displayResetScheduled = false;
 	mode = Mode_MAIN;
+	lcdDirty = true;
 }
 
 void Display::midiMessagePlayed() {
@@ -194,33 +242,32 @@ void Display::midiMessagePlayed() {
 void Display::rhythmNotePlayed() {
 	rhythmNotePlayedSinceLastReset = true;
 	rhythmStateResetTimestamp = synth.renderedSampleCount + BLINK_TIME_FRAMES;
+	midiMessagePlayed();
 	if (synth.controlROMFeatures->oldMT32DisplayFeatures && mode == Mode_CUSTOM_MESSAGE) setMainDisplayMode();
 }
 
 void Display::voicePartStateChanged(Bit8u partIndex, bool activated) {
+	if (mode == Mode_MAIN) lcdDirty = true;
 	voicePartStates[partIndex] = activated;
 	if (synth.controlROMFeatures->oldMT32DisplayFeatures && mode == Mode_CUSTOM_MESSAGE) setMainDisplayMode();
 }
 
 void Display::programChanged(Bit8u partIndex) {
 	if (!synth.controlROMFeatures->oldMT32DisplayFeatures && (mode == Mode_CUSTOM_MESSAGE || mode == Mode_ERROR_MESSAGE)) return;
-	const Part *part = synth.getPart(partIndex);
-	const char *soundGroupName = synth.getSoundGroupName(part);
-	const Bit8u *timbreName = reinterpret_cast<const Bit8u *>(part->getCurrentInstr());
 	mode = Mode_PROGRAM_CHANGE;
-	int position = 0;
-	displayBuffer[position++] = '1' + partIndex;
-	displayBuffer[position++] = FIELD_DELIMITER;
-	memcpy(&displayBuffer[position], soundGroupName, SOUND_GROUP_NAME_WITH_DELIMITER_SIZE);
-	position += SOUND_GROUP_NAME_WITH_DELIMITER_SIZE;
-	copyNullTerminatedString(&displayBuffer[position], timbreName, LCD_TEXT_SIZE - position);
+	lcdDirty = true;
 	scheduleDisplayReset();
+	lastProgramChangePartIndex = partIndex;
+	const Part *part = synth.getPart(partIndex);
+	lastProgramChangeSoundGroupName = synth.getSoundGroupName(part);
+	memcpy(lastProgramChangeTimbreName, part->getCurrentInstr(), TIMBRE_NAME_SIZE);
 }
 
 void Display::checksumErrorOccurred() {
-	mode = Mode_ERROR_MESSAGE;
-	const Bit8u *sysexErrorMessage = &synth.controlROMData[synth.controlROMMap->sysexErrorMessage];
-	memcpy(displayBuffer, sysexErrorMessage, LCD_TEXT_SIZE);
+	if (mode != Mode_ERROR_MESSAGE) {
+		mode = Mode_ERROR_MESSAGE;
+		lcdDirty = true;
+	}
 	if (synth.controlROMFeatures->oldMT32DisplayFeatures) {
 		scheduleDisplayReset();
 	} else {
@@ -235,28 +282,23 @@ bool Display::customDisplayMessageReceived(const Bit8u *message, Bit32u startInd
 			if (c < 32 || 127 < c) c = ' ';
 			customMessageBuffer[i] = c;
 		}
-		if (!synth.controlROMFeatures->quirkDisplayCustomMessagePriority && (mode == Mode_PROGRAM_CHANGE || mode == Mode_ERROR_MESSAGE)) {
-			if (displayResetScheduled && shouldResetTimer(displayResetTimestamp)) {
-				setMainDisplayMode();
-			} else {
-				return false;
-			}
-		}
-		memcpy(displayBuffer, customMessageBuffer, LCD_TEXT_SIZE);
+		if (!synth.controlROMFeatures->quirkDisplayCustomMessagePriority
+			&& (mode == Mode_PROGRAM_CHANGE || mode == Mode_ERROR_MESSAGE)) return false;
+		// Note, real devices keep the display reset timer running.
 	} else {
 		if (startIndex > 0x80) return false;
-		displayResetScheduled = false;
 		if (startIndex == 0x80) {
-			if (mode == Mode_CUSTOM_MESSAGE || mode == Mode_ERROR_MESSAGE) mode = Mode_MAIN;
+			if (mode == Mode_CUSTOM_MESSAGE || mode == Mode_ERROR_MESSAGE) setMainDisplayMode();
 			return false;
 		}
+		displayResetScheduled = false;
 		if (startIndex < LCD_TEXT_SIZE) {
 			if (length > LCD_TEXT_SIZE - startIndex) length = LCD_TEXT_SIZE - startIndex;
 			memcpy(customMessageBuffer + startIndex, message, length);
 		}
-		copyNullTerminatedString(displayBuffer, customMessageBuffer, LCD_TEXT_SIZE);
 	}
 	mode = Mode_CUSTOM_MESSAGE;
+	lcdDirty = true;
 	return true;
 }
 

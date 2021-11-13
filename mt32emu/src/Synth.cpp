@@ -175,6 +175,8 @@ protected:
 		synth.renderedSampleCount += count;
 	}
 
+	void updateDisplayState();
+
 public:
 	Renderer(Synth &useSynth) : synth(useSynth) {}
 
@@ -248,6 +250,9 @@ public:
 	Bit32u midiEventQueueSysexStorageBufferSize;
 
 	Display *display;
+
+	ReportHandler2 defaultReportHandler;
+	ReportHandler2 *reportHandler2;
 };
 
 Bit32u Synth::getLibraryVersionInt() {
@@ -283,13 +288,8 @@ Synth::Synth(ReportHandler *useReportHandler) :
 	controlROMMap = NULL;
 	controlROMFeatures = NULL;
 
-	if (useReportHandler == NULL) {
-		reportHandler = new ReportHandler;
-		isDefaultReportHandler = true;
-	} else {
-		reportHandler = useReportHandler;
-		isDefaultReportHandler = false;
-	}
+	reportHandler = useReportHandler != NULL ? useReportHandler : &extensions.defaultReportHandler;
+	extensions.reportHandler2 = &extensions.defaultReportHandler;
 
 	extensions.preallocatedReverbMemory = false;
 	for (int i = REVERB_MODE_ROOM; i <= REVERB_MODE_TAP_DELAY; i++) {
@@ -333,12 +333,19 @@ Synth::Synth(ReportHandler *useReportHandler) :
 
 Synth::~Synth() {
 	close(); // Make sure we're closed and everything is freed
-	if (isDefaultReportHandler) {
-		delete reportHandler;
-	}
 	delete &mt32ram;
 	delete &mt32default;
 	delete &extensions;
+}
+
+void Synth::setReportHandler2(ReportHandler2 *reportHandler2) {
+	if (reportHandler2 != NULL) {
+		reportHandler = reportHandler2;
+		extensions.reportHandler2 = reportHandler2;
+	} else {
+		reportHandler = &extensions.defaultReportHandler;
+		extensions.reportHandler2 = &extensions.defaultReportHandler;
+	}
 }
 
 void ReportHandler::showLCDMessage(const char *data) {
@@ -1130,7 +1137,6 @@ void Synth::playMsgOnPart(Bit8u part, Bit8u code, Bit8u note, Bit8u velocity) {
 			parts[part]->noteOff(note);
 		} else {
 			parts[part]->noteOn(note, velocity);
-			extensions.display->midiMessagePlayed();
 		}
 		break;
 	case 0xB: // Control change
@@ -1276,7 +1282,7 @@ void Synth::playSysexWithoutHeader(Bit8u device, Bit8u command, const Bit8u *sys
 	Bit8u checksum = calcSysexChecksum(sysex, len - 1);
 	if (checksum != sysex[len - 1]) {
 		printDebug("playSysexWithoutHeader: Message checksum is incorrect (provided: %02x, expected: %02x)!", sysex[len - 1], checksum);
-		extensions.display->checksumErrorOccurred();
+		if (opened) extensions.display->checksumErrorOccurred();
 		return;
 	}
 	len -= 1; // Exclude checksum
@@ -1917,7 +1923,7 @@ bool Synth::getDisplayState(char *targetBuffer) const {
 		targetBuffer[Display::LCD_TEXT_SIZE] = 0;
 		return false;
 	}
-	return extensions.display->updateDisplayState(targetBuffer);
+	return extensions.display->getDisplayState(targetBuffer);
 }
 
 void Synth::setMainDisplayMode() {
@@ -2102,6 +2108,15 @@ Bit32u Synth::getStereoOutputSampleRate() const {
 	return (analog == NULL) ? SAMPLE_RATE : analog->getOutputSampleRate();
 }
 
+void Renderer::updateDisplayState() {
+	bool midiMessageLEDState;
+	bool midiMessageLEDStateUpdated;
+	bool lcdUpdated;
+	synth.extensions.display->checkDisplayStateUpdated(midiMessageLEDState, midiMessageLEDStateUpdated, lcdUpdated);
+	if (midiMessageLEDStateUpdated) synth.extensions.reportHandler2->midiMessageLEDStateUpdated(midiMessageLEDState);
+	if (lcdUpdated) synth.extensions.reportHandler2->lcdStateUpdated();
+}
+
 template <class Sample>
 void RendererImpl<Sample>::doRender(Sample *stereoStream, Bit32u len) {
 	if (!isActivated()) {
@@ -2110,6 +2125,7 @@ void RendererImpl<Sample>::doRender(Sample *stereoStream, Bit32u len) {
 			printDebug("RendererImpl: Invalid call to Analog::process()!\n");
 		}
 		Synth::muteSampleBuffer(stereoStream, len << 1);
+		updateDisplayState();
 		return;
 	}
 
@@ -2466,6 +2482,7 @@ void RendererImpl<Sample>::produceStreams(const DACOutputStreams<Sample> &stream
 
 	getPartialManager().clearAlreadyOutputed();
 	incRenderedSampleCount(len);
+	updateDisplayState();
 }
 
 void Synth::printPartialUsage(Bit32u sampleOffset) {
