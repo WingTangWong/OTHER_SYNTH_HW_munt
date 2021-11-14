@@ -20,8 +20,6 @@
 #include "ui_SynthWidget.h"
 #include "font_6x8.h"
 
-static const MasterClockNanos MINIMUM_UPDATE_INTERVAL_NANOS = 30 * MasterClock::NANOS_PER_MILLISECOND;
-
 static const QColor COLOR_GRAY = QColor(100, 100, 100);
 static const QColor COLOR_GREEN = Qt::green;
 static const QColor lcdUnlitColor = QColor::fromRgba(0x32F2FEEDU);
@@ -68,9 +66,11 @@ SynthStateMonitor::SynthStateMonitor(Ui::SynthWidget *ui, SynthRoute *useSynthRo
 
 	handleSynthStateChange(synthRoute->getState() == SynthRouteState_OPEN ? SynthState_OPEN : SynthState_CLOSED);
 	synthRoute->connectSynth(SIGNAL(stateChanged(SynthState)), this, SLOT(handleSynthStateChange(SynthState)));
-	synthRoute->connectSynth(SIGNAL(audioBlockRendered()), this, SLOT(handleUpdate()));
+	synthRoute->connectSynth(SIGNAL(audioBlockRendered()), this, SLOT(handleAudioBlockRendered()));
 	synthRoute->connectReportHandler(SIGNAL(programChanged(int, QString, QString)), this, SLOT(handleProgramChanged(int, QString, QString)));
 	synthRoute->connectReportHandler(SIGNAL(polyStateChanged(int)), this, SLOT(handlePolyStateChanged(int)));
+	synthRoute->connectReportHandler(SIGNAL(lcdStateChanged()), this, SLOT(handleLCDUpdate()));
+	synthRoute->connectReportHandler(SIGNAL(midiMessageLEDStateChanged(bool)), this, SLOT(handleMidiMessageLEDUpdate(bool)));
 }
 
 SynthStateMonitor::~SynthStateMonitor() {
@@ -82,17 +82,13 @@ SynthStateMonitor::~SynthStateMonitor() {
 }
 
 void SynthStateMonitor::enableMonitor(bool enable) {
-	if (enable) {
-		enabled = true;
-		previousUpdateNanos = MasterClock::getClockNanos() - MINIMUM_UPDATE_INTERVAL_NANOS;
-	} else {
-		enabled = false;
-	}
+	enabled = enable;
 }
 
 void SynthStateMonitor::handleSynthStateChange(SynthState state) {
 	enableMonitor(state == SynthState_OPEN);
 	midiMessageLED.setColor(&COLOR_GRAY);
+	handleLCDUpdate();
 
 	uint newPartialCount = synthRoute->getPartialCount();
 	if (partialCount == newPartialCount || state != SynthState_OPEN) {
@@ -109,8 +105,6 @@ void SynthStateMonitor::handleSynthStateChange(SynthState state) {
 		patchNameLabel[i]->setText((i < 8) ? synthRoute->getPatchName(i) : "Rhythm Channel");
 		partStateWidget[i]->update();
 	}
-
-	handleUpdate();
 }
 
 void SynthStateMonitor::handlePolyStateChanged(int partNum) {
@@ -121,15 +115,18 @@ void SynthStateMonitor::handleProgramChanged(int partNum, QString, QString patch
 	patchNameLabel[partNum]->setText(patchName);
 }
 
-void SynthStateMonitor::handleUpdate() {
+void SynthStateMonitor::handleLCDUpdate() {
 	if (!enabled) return;
-	MasterClockNanos nanosNow = MasterClock::getClockNanos();
-	if (nanosNow - previousUpdateNanos < MINIMUM_UPDATE_INTERVAL_NANOS) return;
-	previousUpdateNanos = nanosNow;
-	bool midiMessageOn = synthRoute->getDisplayState(lcdWidget.lcdText);
+	synthRoute->getDisplayState(lcdWidget.lcdText);
 	lcdWidget.update();
-	midiMessageLED.setColor(midiMessageOn ? &COLOR_GREEN : &COLOR_GRAY);
+}
 
+void SynthStateMonitor::handleMidiMessageLEDUpdate(bool midiMessageOn) {
+	if (enabled) midiMessageLED.setColor(midiMessageOn ? &COLOR_GREEN : &COLOR_GRAY);
+}
+
+void SynthStateMonitor::handleAudioBlockRendered() {
+	if (!enabled) return;
 	synthRoute->getPartialStates(partialStates);
 	for (unsigned int partialNum = 0; partialNum < partialCount; partialNum++) {
 		partialStateLED[partialNum]->setColor(&partialStateColor[partialStates[partialNum]]);

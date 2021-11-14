@@ -480,10 +480,6 @@ const QString SynthRoute::getPatchName(int partNum) const {
 	return qSynth.getPatchName(partNum);
 }
 
-void SynthRoute::getPartStates(bool *partStates) const {
-	qSynth.getPartStates(partStates);
-}
-
 void SynthRoute::getPartialStates(PartialState *partialStates) const {
 	qSynth.getPartialStates(partialStates);
 }

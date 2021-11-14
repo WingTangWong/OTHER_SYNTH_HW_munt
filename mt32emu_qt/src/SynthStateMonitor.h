@@ -89,7 +89,6 @@ private:
 	MT32Emu::Bit8u *keysOfPlayingNotes;
 	MT32Emu::Bit8u *velocitiesOfPlayingNotes;
 
-	MasterClockNanos previousUpdateNanos;
 	bool enabled;
 	uint partialCount;
 
@@ -97,10 +96,12 @@ private:
 	void freePartialsData();
 
 private slots:
-	void handleUpdate();
 	void handleSynthStateChange(SynthState);
 	void handlePolyStateChanged(int partNum);
 	void handleProgramChanged(int partNum, QString soundGroupName, QString patchName);
+	void handleLCDUpdate();
+	void handleMidiMessageLEDUpdate(bool);
+	void handleAudioBlockRendered();
 };
 
 #endif
