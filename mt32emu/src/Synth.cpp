@@ -2117,8 +2117,8 @@ void Renderer::updateDisplayState() {
 	bool midiMessageLEDStateUpdated;
 	bool lcdUpdated;
 	synth.extensions.display->checkDisplayStateUpdated(midiMessageLEDState, midiMessageLEDStateUpdated, lcdUpdated);
-	if (midiMessageLEDStateUpdated) synth.extensions.reportHandler2->midiMessageLEDStateUpdated(midiMessageLEDState);
-	if (lcdUpdated) synth.extensions.reportHandler2->lcdStateUpdated();
+	if (midiMessageLEDStateUpdated) synth.extensions.reportHandler2->onMidiMessageLEDStateUpdated(midiMessageLEDState);
+	if (lcdUpdated) synth.extensions.reportHandler2->onLCDStateUpdated();
 }
 
 template <class Sample>

@@ -119,9 +119,9 @@ public:
 	virtual ~ReportHandler2() {}
 
 	// Invoked when the emulated LCD changes state. Use method Synth::getDisplayState to retrieve the actual data.
-	virtual void lcdStateUpdated() {}
+	virtual void onLCDStateUpdated() {}
 	// Invoked when the emulated MIDI message LED changes state. The state parameter represents whether the MIDI MESSAGE LED is ON.
-	virtual void midiMessageLEDStateUpdated(bool /* ledState */) {}
+	virtual void onMidiMessageLEDStateUpdated(bool /* ledState */) {}
 };
 
 class Synth {
