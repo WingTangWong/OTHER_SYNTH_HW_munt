@@ -47,6 +47,7 @@ public:
 	void midiMessagePlayed();
 	void rhythmNotePlayed();
 	void voicePartStateChanged(Bit8u partIndex, bool activated);
+	void masterVolumeChanged();
 	void programChanged(Bit8u partIndex);
 	void checksumErrorOccurred();
 	bool customDisplayMessageReceived(const Bit8u *message, Bit32u startIndex, Bit32u length);

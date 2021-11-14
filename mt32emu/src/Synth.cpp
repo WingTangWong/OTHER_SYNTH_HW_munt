@@ -1868,6 +1868,10 @@ void Synth::refreshSystemChanAssign(Bit8u firstPart, Bit8u lastPart) {
 }
 
 void Synth::refreshSystemMasterVol() {
+	// Note, this should only occur when the user turns the volume knob. When the master volume is set via a SysEx, display
+	// doesn't actually update on all real devices. However, we anyway update the display, as we don't foresee a dedicated
+	// API for setting the master volume yet it's rather dubious that one really needs this quirk to be fairly emulated.
+	if (opened) extensions.display->masterVolumeChanged();
 #if MT32EMU_MONITOR_SYSEX > 0
 	printDebug(" Master volume: %d", mt32ram.system.masterVol);
 #endif

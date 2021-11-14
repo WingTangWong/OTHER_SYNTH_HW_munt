@@ -252,6 +252,10 @@ void Display::voicePartStateChanged(Bit8u partIndex, bool activated) {
 	if (synth.controlROMFeatures->oldMT32DisplayFeatures && mode == Mode_CUSTOM_MESSAGE) setMainDisplayMode();
 }
 
+void Display::masterVolumeChanged() {
+	if (mode == Mode_MAIN) lcdDirty = true;
+}
+
 void Display::programChanged(Bit8u partIndex) {
 	if (!synth.controlROMFeatures->oldMT32DisplayFeatures && (mode == Mode_CUSTOM_MESSAGE || mode == Mode_ERROR_MESSAGE)) return;
 	mode = Mode_PROGRAM_CHANGE;
@@ -288,7 +292,7 @@ bool Display::customDisplayMessageReceived(const Bit8u *message, Bit32u startInd
 	} else {
 		if (startIndex > 0x80) return false;
 		if (startIndex == 0x80) {
-			if (mode == Mode_CUSTOM_MESSAGE || mode == Mode_ERROR_MESSAGE) setMainDisplayMode();
+			if (mode != Mode_PROGRAM_CHANGE) setMainDisplayMode();
 			return false;
 		}
 		displayResetScheduled = false;
