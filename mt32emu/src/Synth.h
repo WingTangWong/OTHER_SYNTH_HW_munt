@@ -118,7 +118,8 @@ class MT32EMU_EXPORT_V(2.6) ReportHandler2 : public ReportHandler {
 public:
 	virtual ~ReportHandler2() {}
 
-	// Invoked when the emulated LCD changes state. Use method Synth::getDisplayState to retrieve the actual data.
+	// Invoked to signal about a change of the emulated LCD state. Use method Synth::getDisplayState to retrieve the actual data.
+	// This callback will not be invoked on further changes, until the client retrieves the LCD state.
 	virtual void onLCDStateUpdated() {}
 	// Invoked when the emulated MIDI message LED changes state. The state parameter represents whether the MIDI MESSAGE LED is ON.
 	virtual void onMidiMessageLEDStateUpdated(bool /* ledState */) {}
@@ -554,11 +555,15 @@ public:
 	MT32EMU_EXPORT void readMemory(Bit32u addr, Bit32u len, Bit8u *data);
 
 	// Retrieves the current state of the emulated MT-32 display facilities.
-	// Typically, the state is updated during the rendering. However, there might be no need to invoke this method after each call to render(),
-	// e.g. when the render buffer is just a few milliseconds long.
+	// Typically, the state is updated during the rendering. When that happens, a related callback from ReportHandler2 is invoked.
+	// However, there might be no need to invoke this method after each update, e.g. when the render buffer is just a few milliseconds
+	// long.
 	// The argument targetBuffer must point to an array of at least 21 characters. The result is a null-terminated string.
+	// The optional argument narrowLCD enables a condensed representation of the displayed information in some cases. This is mainly
+	// intended to route the result to a hardware LCD that is only 16 characters wide. Automatic scrolling of longer strings
+	// is not supported.
 	// Returns whether the MIDI MESSAGE LED is ON and fills the targetBuffer parameter.
-	MT32EMU_EXPORT_V(2.6) bool getDisplayState(char *targetBuffer) const;
+	MT32EMU_EXPORT_V(2.6) bool getDisplayState(char *targetBuffer, bool narrowLCD = false) const;
 
 	// Resets the emulated LCD to the main mode (Master Volume). This has the same effect as pressing the Master Volume button
 	// while the display shows some other message. Useful for the new-gen devices as those require a special Display Reset SysEx

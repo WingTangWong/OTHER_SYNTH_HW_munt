@@ -41,7 +41,7 @@ public:
 	Display(Synth &synth);
 	void checkDisplayStateUpdated(bool &midiMessageLEDState, bool &midiMessageLEDUpdated, bool &lcdUpdated);
 	/** Returns whether the MIDI MESSAGE LED is ON and fills the targetBuffer parameter. */
-	bool getDisplayState(char *targetBuffer);
+	bool getDisplayState(char *targetBuffer, bool narrowLCD);
 	void setMainDisplayMode();
 
 	void midiMessagePlayed();

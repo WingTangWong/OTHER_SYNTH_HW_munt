@@ -105,7 +105,8 @@ namespace MT32Emu {
  *   message is received on that part (sometimes even when that actually produces no sound).
  */
 
-static const char MASTER_VOLUME_WITH_DELIMITER[] = "|vol:  0";
+static const char MASTER_VOLUME_WITH_DELIMITER[] = "|  0";
+static const char MASTER_VOLUME_WITH_DELIMITER_AND_PREFIX[] = "|vol:  0";
 static const Bit8u RHYTHM_PART_CODE = 'R';
 static const Bit8u FIELD_DELIMITER = '|';
 static const Bit8u ACTIVE_PART_INDICATOR = 1;
@@ -113,6 +114,7 @@ static const Bit8u ACTIVE_PART_INDICATOR = 1;
 static const Bit32u DISPLAYED_VOICE_PARTS_COUNT = 5;
 static const Bit32u SOUND_GROUP_NAME_WITH_DELIMITER_SIZE = 8;
 static const Bit32u MASTER_VOLUME_WITH_DELIMITER_SIZE = sizeof(MASTER_VOLUME_WITH_DELIMITER) - 1;
+static const Bit32u MASTER_VOLUME_WITH_DELIMITER_AND_PREFIX_SIZE = sizeof(MASTER_VOLUME_WITH_DELIMITER_AND_PREFIX) - 1;
 
 // This is the period to show those short blinks of MIDI MESSAGE LED and the rhythm part state.
 // Two related countdowns are initialised to 8 and touched each 10 milliseconds by the software timer 0 interrupt handler.
@@ -150,7 +152,7 @@ Display::Display(Synth &useSynth) :
 	const Bit8u *startupMessage = &synth.controlROMData[synth.controlROMMap->startupMessage];
 	memcpy(displayBuffer, startupMessage, LCD_TEXT_SIZE);
 	memset(customMessageBuffer, ' ', LCD_TEXT_SIZE);
-	memset(voicePartStates, 0, 8);
+	memset(voicePartStates, 0, sizeof voicePartStates);
 }
 
 void Display::checkDisplayStateUpdated(bool &midiMessageLEDState, bool &midiMessageLEDUpdated, bool &lcdUpdated) {
@@ -173,7 +175,7 @@ void Display::checkDisplayStateUpdated(bool &midiMessageLEDState, bool &midiMess
 	if (lcdUpdated) lcdUpdateSignalled = true;
 }
 
-bool Display::getDisplayState(char *targetBuffer) {
+bool Display::getDisplayState(char *targetBuffer, bool narrowLCD) {
 	if (lcdUpdateSignalled) {
 		lcdDirty = false;
 		lcdUpdateSignalled = false;
@@ -195,8 +197,12 @@ bool Display::getDisplayState(char *targetBuffer) {
 			Bit8u *writePosition = displayBuffer;
 			*writePosition++ = '1' + lastProgramChangePartIndex;
 			*writePosition++ = FIELD_DELIMITER;
-			memcpy(writePosition, lastProgramChangeSoundGroupName, SOUND_GROUP_NAME_WITH_DELIMITER_SIZE);
-			writePosition += SOUND_GROUP_NAME_WITH_DELIMITER_SIZE;
+			if (narrowLCD) {
+				writePosition[TIMBRE_NAME_SIZE] = 0;
+			} else {
+				memcpy(writePosition, lastProgramChangeSoundGroupName, SOUND_GROUP_NAME_WITH_DELIMITER_SIZE);
+				writePosition += SOUND_GROUP_NAME_WITH_DELIMITER_SIZE;
+			}
 			copyNullTerminatedString(writePosition, lastProgramChangeTimbreName, TIMBRE_NAME_SIZE);
 			break;
 		}
@@ -208,8 +214,14 @@ bool Display::getDisplayState(char *targetBuffer) {
 			}
 			*writePosition++ = lastRhythmPartState ? ACTIVE_PART_INDICATOR : RHYTHM_PART_CODE;
 			*writePosition++ = ' ';
-			memcpy(writePosition, MASTER_VOLUME_WITH_DELIMITER, MASTER_VOLUME_WITH_DELIMITER_SIZE);
-			writePosition += MASTER_VOLUME_WITH_DELIMITER_SIZE;
+			if (narrowLCD) {
+				memcpy(writePosition, MASTER_VOLUME_WITH_DELIMITER, MASTER_VOLUME_WITH_DELIMITER_SIZE);
+				writePosition += MASTER_VOLUME_WITH_DELIMITER_SIZE;
+				*writePosition = 0;
+			} else {
+				memcpy(writePosition, MASTER_VOLUME_WITH_DELIMITER_AND_PREFIX, MASTER_VOLUME_WITH_DELIMITER_AND_PREFIX_SIZE);
+				writePosition += MASTER_VOLUME_WITH_DELIMITER_AND_PREFIX_SIZE;
+			}
 			Bit32u masterVol = synth.mt32ram.system.masterVol;
 			while (masterVol > 0) {
 				std::div_t result = std::div(masterVol, 10);

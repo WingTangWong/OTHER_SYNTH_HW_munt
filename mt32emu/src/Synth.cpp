@@ -1921,13 +1921,13 @@ Bit32s Synth::getMasterTunePitchDelta() const {
 	return extensions.masterTunePitchDelta;
 }
 
-bool Synth::getDisplayState(char *targetBuffer) const {
+bool Synth::getDisplayState(char *targetBuffer, bool narrowLCD) const {
 	if (!opened) {
 		memset(targetBuffer, ' ', Display::LCD_TEXT_SIZE);
 		targetBuffer[Display::LCD_TEXT_SIZE] = 0;
 		return false;
 	}
-	return extensions.display->getDisplayState(targetBuffer);
+	return extensions.display->getDisplayState(targetBuffer, narrowLCD);
 }
 
 void Synth::setMainDisplayMode() {

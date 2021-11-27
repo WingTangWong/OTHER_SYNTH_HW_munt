@@ -20,8 +20,8 @@
 #include "ui_SynthWidget.h"
 #include "font_6x8.h"
 
-static const QColor COLOR_GRAY = QColor(100, 100, 100);
-static const QColor COLOR_GREEN = Qt::green;
+static const QColor COLOR_GRAY(100, 100, 100);
+static const QColor COLOR_GREEN(Qt::green);
 static const QColor lcdUnlitColor = QColor::fromRgba(0x32F2FEEDU);
 static const QColor lcdLitColor = QColor::fromRgb(0xCAFB10U);
 static const QColor partialStateColor[] = {COLOR_GRAY, Qt::red, Qt::yellow, Qt::green};
@@ -34,7 +34,8 @@ static const uint LCD_PIXEL_SIZE = 7;
 static const uint LCD_PIXEL_SIZE_WITH_SPACING = 8;
 static const uint LCD_UNDERLINE_GAP = LCD_PIXEL_SIZE_WITH_SPACING;
 static const uint LCD_COLUMN_SIZE_WITH_SPACING = 6 * LCD_PIXEL_SIZE_WITH_SPACING;
-static const QPoint LCD_CONTENT_INSETS = QPoint(8, 10);
+
+static const QPoint LCD_CONTENT_INSETS(8, 10);
 
 using namespace MT32Emu;
 
@@ -227,15 +228,28 @@ void LCDWidget::paintEvent(QPaintEvent *) {
 	lcdPainter.translate(LCD_CONTENT_INSETS);
 	lcdPainter.scale(LCD_SCALE_FACTOR, LCD_SCALE_FACTOR);
 
+	bool endOfText = false;
 	QRect rect(0, 0, LCD_PIXEL_SIZE, LCD_PIXEL_SIZE);
 	for (int position = 0; position < 20; position++) {
-		uchar charCode = lcdText[position];
+		uchar charCode = endOfText ? 0x20 : lcdText[position];
 
 		// Map special characters to what we have defined in the font.
-		if (charCode > 0x7f) charCode = 0x20;
-		else if (charCode == 0x01) charCode = 0x80;
-		else if (charCode == 0x02) charCode = 0x7C;
-		else if (charCode < 0x20) charCode = 0x20;
+		if (charCode < 0x20) {
+			switch (charCode) {
+			case 0x02:
+				charCode = 0x7C;
+				break;
+			case 0x01:
+				charCode = 0x80;
+				break;
+			case 0x00:
+				endOfText = true;
+				// Fall-through
+			default:
+				charCode = 0x20;
+				break;
+			}
+		} else if (charCode > 0x7f) charCode = 0x20;
 
 		charCode -= 0x20;
 
