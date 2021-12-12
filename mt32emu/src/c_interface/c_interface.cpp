@@ -536,8 +536,13 @@ mt32emu_return_code mt32emu_identify_rom_file(mt32emu_rom_info *rom_info, const 
 
 mt32emu_context mt32emu_create_context(mt32emu_report_handler_i report_handler, void *instance_data) {
 	mt32emu_data *data = new mt32emu_data;
-	data->reportHandler = (report_handler.v0 == NULL) ? NULL : new DelegatingReportHandlerAdapter(report_handler, instance_data);
-	data->synth = new Synth(data->reportHandler);
+	data->synth = new Synth;
+	if (report_handler.v0 != NULL) {
+		data->reportHandler = new DelegatingReportHandlerAdapter(report_handler, instance_data);
+		data->synth->setReportHandler2(data->reportHandler);
+	} else {
+		data->reportHandler = NULL;
+	}
 	data->midiParser = new DefaultMidiStreamParser(*data->synth);
 	data->controlROMImage = NULL;
 	data->pcmROMImage = NULL;
