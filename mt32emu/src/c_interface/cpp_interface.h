@@ -118,8 +118,8 @@ mt32emu_service_i mt32emu_get_service_i();
 #define mt32emu_get_playing_notes i.v0->getPlayingNotes
 #define mt32emu_get_patch_name i.v0->getPatchName
 #define mt32emu_read_memory i.v0->readMemory
-#define mt32emu_get_display_state iV5->getDisplayState
-#define mt32emu_set_main_display_mode iV5->setMainDisplayMode
+#define mt32emu_get_display_state iV5()->getDisplayState
+#define mt32emu_set_main_display_mode iV5()->setMainDisplayMode
 
 #else // #if MT32EMU_API_TYPE == 2
 
