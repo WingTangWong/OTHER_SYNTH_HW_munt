@@ -1332,7 +1332,7 @@ void Synth::readSysex(Bit8u /*device*/, const Bit8u * /*sysex*/, Bit32u /*len*/)
 }
 
 void Synth::writeSysex(Bit8u device, const Bit8u *sysex, Bit32u len) {
-	if (!opened) return;
+	if (!opened || len < 1) return;
 
 	// This is checked early in the real devices (before any sysex length checks or further processing)
 	if (sysex[0] == 0x7F) {
@@ -1351,7 +1351,7 @@ void Synth::writeSysex(Bit8u device, const Bit8u *sysex, Bit32u len) {
 			extensions.display->displayControlMessageReceived(sysex, len);
 			return;
 		}
-		printDebug("playSysexWithoutHeader: Message is too short (%d bytes)!", len);
+		printDebug("writeSysex: Message is too short (%d bytes)!", len);
 		return;
 	}
 
